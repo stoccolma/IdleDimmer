@@ -52,6 +52,15 @@ Dimming and keep awake need no permissions.
 - **Not everything is tested.** Verified with the lock on: screenshots, browser automation through the Claude in Chrome extension, and typing into a native app with Claude's background computer use. Not verified: agents that take over the whole screen, and ChatGPT.
 - If the app crashes while the display is dimmed, restore brightness with the keyboard keys.
 
+## Why it is not in the Mac App Store
+
+App Store apps must run in Apple's App Sandbox and may only use public system functions. IdleDimmer cannot meet that and stay the same app:
+
+- **Brightness.** macOS has no public function for changing display brightness, so IdleDimmer uses the internal one behind the brightness keys. Tested in the sandbox, the app reports that brightness control is unavailable, and Apple's review rules reject internal functions regardless.
+- **The decoy lock.** A screen that imitates the lock screen, blocks input system-wide and records the camera is unlikely to pass review.
+
+So it is distributed here instead, with the source open for anyone who wants to read what it does before running it.
+
 ## Development
 
 Everything is in `main.swift`; there are no dependencies.
@@ -60,6 +69,9 @@ Everything is in `main.swift`; there are no dependencies.
     IdleDimmer.app/Contents/MacOS/IdleDimmer --probe      # read-only brightness check
     IdleDimmer.app/Contents/MacOS/IdleDimmer --camera-test 3   # record a 3-second clip
     tools/make-icon.sh                                    # regenerate the app icon
+    tools/release.sh                                      # build, notarize and zip for download
+
+`tools/release.sh` needs a Developer ID certificate and notarization credentials stored once with `xcrun notarytool store-credentials IdleDimmer`.
 
 *Debug logging* in the menu writes state samples to `~/Library/Logs/IdleDimmer/debug.log` (no key contents, no screenshots). `restore-regression.swift` and `keep-awake-regression.swift` are standalone checks run with `swift <file>`. Design notes and test history are in [docs/DEVLOG.md](docs/DEVLOG.md).
 
