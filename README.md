@@ -23,7 +23,11 @@ Menu bar icon: orange when keep awake is running, green when automatic dimming i
 
 ## Install
 
-Requires macOS 13 or later and the Xcode command line tools (`xcode-select --install`).
+Requires macOS 13 or later.
+
+**Download:** get `IdleDimmer-1.0.zip` from the [latest release](https://github.com/stoccolma/IdleDimmer/releases/latest), unzip it and open IdleDimmer.app. It is signed and notarized by Apple, so it opens without a warning. Look for the ◐ in the menu bar.
+
+**Or build it yourself** (needs the Xcode command line tools, `xcode-select --install`):
 
     git clone https://github.com/stoccolma/IdleDimmer.git
     cd IdleDimmer
