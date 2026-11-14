@@ -1,0 +1,25 @@
+Skenlås-test 2026-11-14, omgång 2 (09:33:40–09:34:30)
+Täckfönstret (1800x1125, undantaget från skärmdelning) låg på skärmen före och efter varje steg.
+
+1. Skärmdump av Chrome-fönstret (computer use): OK
+   Bilden visade Chrome, inte låsskärmen. Avläst: google.com med knapparna
+   "Google Search" och "I'm Feeling Lucky", "Google offered in: svenska".
+
+2. Navigering och textläsning via Claude in Chrome-tillägget: OK
+   https://example.com
+
+   Title: Example Domain
+   This domain is for use in documentation examples without needing permission.
+   This is not a service; avoid relying on it for testing and monitoring purposes.
+   Learn more
+
+3. Skriva i TextEdit med computer use (09:36:26–09:36:56, ny låsning): OK
+   Nytt dokument via menyn, klick i textytan, två textrader, radbrytning och
+   ett tabbtryck som gick som rå tangentinmatning. Skärmdumpen visade:
+
+   Skrivet av Claude under skenlaset.
+       Rad tva efter riktiga tangenttryck.
+
+Inte testat: agent som tar över hela skärmen (mus/tangentbord på skärmnivå)
+och ChatGPT. Ett eget testprogram för postade händelser fungerade inte ens
+med olåst skärm och säger därför inget om låset.
