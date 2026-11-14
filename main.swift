@@ -4,6 +4,10 @@ import CoreGraphics
 import CryptoKit
 import Darwin
 
+/// Picks the Swedish text when Swedish is the preferred system language, English otherwise.
+let swedish = Locale.preferredLanguages.first?.hasPrefix("sv") == true
+func t(_ english: String, _ svenska: String) -> String { swedish ? svenska : english }
+
 final class DebugLog {
     static let shared = DebugLog()
     let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/IdleDimmer/debug.log")
@@ -227,7 +231,7 @@ final class FakeLock {
         case 36, 76:
             if matches(typed) { unlock(); return }
             typed = ""
-            field?.stringValue = "Fel lösenord"
+            field?.stringValue = t("Wrong password", "Fel lösenord")
             failures.append(Date())
             onWrongCode?()
             return
@@ -242,7 +246,7 @@ final class FakeLock {
             guard typed.count < 64 else { return }
             typed += text
         }
-        field?.stringValue = typed.isEmpty ? "Ange lösenord" : String(repeating: "●", count: typed.count)
+        field?.stringValue = typed.isEmpty ? t("Enter Password", "Ange lösenord") : String(repeating: "●", count: typed.count)
     }
 
     private func label(_ size: CGFloat, _ weight: NSFont.Weight, alpha: CGFloat) -> NSTextField {
@@ -278,7 +282,7 @@ final class FakeLock {
                 let user = label(15, .medium, alpha: 0.9)
                 user.stringValue = NSFullUserName()
                 let field = label(13, .regular, alpha: 0.75)
-                field.stringValue = "Ange lösenord"
+                field.stringValue = t("Enter Password", "Ange lösenord")
                 let pill = NSView()
                 pill.wantsLayer = true
                 pill.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
@@ -340,6 +344,7 @@ final class Controller: NSObject, NSApplicationDelegate {
     var waitForActivity = false
     let delay = 300.0
     let dimLevel: Float = 0.05
+    let idleTitle = t("5 minutes idle → 5% brightness", "5 minuter inaktiv → 5 % ljusstyrka")
     var status: NSMenuItem!
     var toggle: NSMenuItem!
     var debugItem: NSMenuItem!
@@ -352,20 +357,36 @@ final class Controller: NSObject, NSApplicationDelegate {
         updateIcon()
 
         let menu = NSMenu()
-        status = NSMenuItem(title: "5 minutes idle → 5% brightness", action: nil, keyEquivalent: "")
+        func add(_ title: String, _ symbol: String, _ action: Selector?) -> NSMenuItem {
+            let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            entry.target = self
+            entry.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            menu.addItem(entry)
+            return entry
+        }
+        status = NSMenuItem(title: idleTitle, action: nil, keyEquivalent: "")
         menu.addItem(status)
-        toggle = NSMenuItem(title: "Enabled", action: #selector(toggleEnabled), keyEquivalent: "")
-        toggle.target = self; toggle.state = .on; menu.addItem(toggle)
-        awakeItem = NSMenuItem(title: "Håll datorn vaken (caffeinate -di)", action: #selector(toggleKeepAwake), keyEquivalent: "")
-        awakeItem.target = self; menu.addItem(awakeItem)
+        menu.addItem(.separator())
+        toggle = add(t("Dim automatically", "Dimma automatiskt"), "sun.min", #selector(toggleEnabled))
+        toggle.state = .on
+        awakeItem = add(t("Keep Mac awake", "Håll datorn vaken"), "cup.and.saucer", #selector(toggleKeepAwake))
+        _ = add(t("Dim now", "Dimma nu"), "moon", #selector(dimNow))
+        _ = add(t("Restore brightness", "Återställ ljusstyrka"), "sun.max", #selector(restoreNow))
+        menu.addItem(.separator())
+        _ = add(t("Lock screen (decoy)", "Lås skärmen (skenlås)"), "lock", #selector(lockScreen))
+        _ = add(t("Set unlock code…", "Ställ in upplåsningskod…"), "key", #selector(chooseCode))
+        _ = add(t("Show wrong-code clips", "Visa filmer från fel kod"), "video", #selector(openClips))
+        menu.addItem(.separator())
+        debugItem = add(t("Debug logging", "Debugloggning"), "ladybug", #selector(toggleDebug))
+        debugItem.state = DebugLog.shared.enabled ? .on : .off
+        _ = add(t("Open debug log", "Öppna debugloggen"), "doc.text", #selector(openLog))
+        _ = add(t("Capture debug snapshot", "Spara debugögonblick"), "camera.viewfinder", #selector(snapshot))
+        menu.addItem(.separator())
+        _ = add(t("Quit IdleDimmer", "Avsluta IdleDimmer"), "power", #selector(quit))
         keepAwake.onChange = { [weak self] in
             guard let self else { return }
             self.awakeItem.state = self.keepAwake.isRunning ? .on : .off
             self.updateIcon()
-        }
-        for (title, action) in [("Lås skärmen (skenlås)", #selector(lockScreen)), ("Ställ in upplåsningskod…", #selector(chooseCode)), ("Visa filmer från fel kod", #selector(openClips))] {
-            let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
-            entry.target = self; menu.addItem(entry)
         }
         fakeLock.onWrongCode = { [weak self] in self?.intruderCam.record() }
         fakeLock.onUnlock = { [weak self] attempts in
@@ -376,20 +397,8 @@ final class Controller: NSObject, NSApplicationDelegate {
             self.lockStartedKeepAwake = false
             self.previousIdle = self.idle()
         }
-        for (title, action) in [("Dim now", #selector(dimNow)), ("Restore brightness", #selector(restoreNow)), ("Quit IdleDimmer", #selector(quit))] {
-            let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
-            entry.target = self; menu.addItem(entry)
-        }
-        menu.addItem(.separator())
-        debugItem = NSMenuItem(title: "Debug logging", action: #selector(toggleDebug), keyEquivalent: "")
-        debugItem.target = self; debugItem.state = DebugLog.shared.enabled ? .on : .off
-        menu.addItem(debugItem)
-        for (title, action) in [("Open debug log", #selector(openLog)), ("Capture debug snapshot", #selector(snapshot))] {
-            let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
-            entry.target = self; menu.addItem(entry)
-        }
         item.menu = menu
-        DebugLog.shared.write("launch build=2026-11-14-fake-lock-cam-audio pid=\(ProcessInfo.processInfo.processIdentifier)")
+        DebugLog.shared.write("launch build=2026-11-14-public pid=\(ProcessInfo.processInfo.processIdentifier)")
         previousIdle = idle()
         // Starting the utility never immediately dims a long-idle desktop.
         waitForActivity = previousIdle >= delay
@@ -400,7 +409,7 @@ final class Controller: NSObject, NSApplicationDelegate {
             NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(woke), name: name, object: nil)
         }
         if brightness.builtIn().flatMap({ brightness.read($0) }) == nil {
-            status.title = "Built-in display brightness unavailable"
+            status.title = t("Built-in display brightness unavailable", "Den inbyggda skärmens ljusstyrka går inte att styra")
         }
     }
     func tick() {
@@ -440,11 +449,11 @@ final class Controller: NSObject, NSApplicationDelegate {
         if !brightness.write(sample.id, dimLevel) {
             // A failed call may still have changed the screen; retain the target.
             restorePending = true
-            status.title = "Dim failed — restoring saved brightness"
+            status.title = t("Dim failed — restoring saved brightness", "Dimning misslyckades — återställer ljusstyrkan")
             return
         }
         DebugLog.shared.write("dim applied; fixed restore target=\(sample.value)")
-        status.title = "Dimmed — move mouse or press a key"
+        status.title = t("Dimmed — move mouse or press a key", "Dimmad — rör musen eller tryck på en tangent")
     }
     func restore() {
         guard let (id, value) = saved else { restorePending = false; return }
@@ -457,7 +466,7 @@ final class Controller: NSObject, NSApplicationDelegate {
             restorePending = false
         }
         DebugLog.shared.write("restore verified=\(!restorePending) readback=\(String(describing: actual))")
-        status.title = restorePending ? "Restoring brightness — retry pending" : "5 minutes idle → 5% brightness"
+        status.title = restorePending ? t("Restoring brightness — retry pending", "Återställer ljusstyrkan — försöker igen") : idleTitle
     }
     @objc func dimNow() {
         dimRequest?.cancel()
@@ -502,7 +511,7 @@ final class Controller: NSObject, NSApplicationDelegate {
             catch {
                 DebugLog.shared.write("caffeinate launch failed: \(error)")
                 let alert = NSAlert()
-                alert.messageText = "Kunde inte hålla datorn vaken"
+                alert.messageText = t("Could not keep the Mac awake", "Kunde inte hålla datorn vaken")
                 alert.informativeText = error.localizedDescription
                 alert.runModal()
             }
@@ -512,11 +521,11 @@ final class Controller: NSObject, NSApplicationDelegate {
     @discardableResult @objc func chooseCode() -> Bool {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Upplåsningskod för skenlåset"
-        alert.informativeText = "Skriv koden och tryck Retur på den låsta skärmen för att låsa upp. Minst 4 tecken."
+        alert.messageText = t("Unlock code for the decoy lock", "Upplåsningskod för skenlåset")
+        alert.informativeText = t("Type the code and press Return on the locked screen to unlock. At least 4 characters.", "Skriv koden och tryck Retur på den låsta skärmen för att låsa upp. Minst 4 tecken.")
         let input = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
         alert.accessoryView = input
-        alert.addButton(withTitle: "Spara"); alert.addButton(withTitle: "Avbryt")
+        alert.addButton(withTitle: t("Save", "Spara")); alert.addButton(withTitle: t("Cancel", "Avbryt"))
         alert.window.initialFirstResponder = input
         guard alert.runModal() == .alertFirstButtonReturn else { return false }
         guard input.stringValue.count >= 4 else { return chooseCode() }
@@ -528,9 +537,9 @@ final class Controller: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = attempts.count == 1 ? "1 försök med fel kod medan skärmen var låst" : "\(attempts.count) försök med fel kod medan skärmen var låst"
-        alert.informativeText = "Tidpunkter: " + attempts.prefix(20).map { time.string(from: $0) }.joined(separator: ", ") + (attempts.count > 20 ? " …" : "") + "\n\nFilmerna ligger i \(IntruderCam.folder.path)."
-        alert.addButton(withTitle: "Visa filmer"); alert.addButton(withTitle: "OK")
+        alert.messageText = attempts.count == 1 ? t("1 wrong-code attempt while the screen was locked", "1 försök med fel kod medan skärmen var låst") : t("\(attempts.count) wrong-code attempts while the screen was locked", "\(attempts.count) försök med fel kod medan skärmen var låst")
+        alert.informativeText = t("Times: ", "Tidpunkter: ") + attempts.prefix(20).map { time.string(from: $0) }.joined(separator: ", ") + (attempts.count > 20 ? " …" : "") + "\n\n" + t("The clips are in", "Filmerna ligger i") + " \(IntruderCam.folder.path)."
+        alert.addButton(withTitle: t("Show clips", "Visa filmer")); alert.addButton(withTitle: "OK")
         if alert.runModal() == .alertFirstButtonReturn { openClips() }
     }
     @objc func openClips() {
@@ -545,8 +554,8 @@ final class Controller: NSObject, NSApplicationDelegate {
             _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
             NSApp.activate(ignoringOtherApps: true)
             let alert = NSAlert()
-            alert.messageText = "Skenlåset behöver behörigheten Hjälpmedel"
-            alert.informativeText = "Utan den kan fysiska tangent- och mustryck inte stoppas. Tillåt IdleDimmer under Systeminställningar → Integritet och säkerhet → Hjälpmedel och välj sedan Lås skärmen igen."
+            alert.messageText = t("The decoy lock needs Accessibility permission", "Skenlåset behöver behörigheten Hjälpmedel")
+            alert.informativeText = t("Without it, physical key presses and clicks cannot be blocked. Allow IdleDimmer under System Settings → Privacy & Security → Accessibility, then choose Lock screen again.", "Utan den kan fysiska tangent- och mustryck inte stoppas. Tillåt IdleDimmer under Systeminställningar → Integritet och säkerhet → Hjälpmedel och välj sedan Lås skärmen igen.")
             alert.runModal()
             return
         }
@@ -562,7 +571,8 @@ final class Controller: NSObject, NSApplicationDelegate {
             .foregroundColor: keepAwake.isRunning ? NSColor.systemOrange : (enabled ? NSColor.systemGreen : NSColor.white),
             .font: NSFont.systemFont(ofSize: 17)
         ])
-        item.button?.toolTip = "IdleDimmer — dimning: \(enabled ? "på" : "av"), håll vaken: \(keepAwake.isRunning ? "på" : "av")"
+        let on = t("on", "på"), off = t("off", "av")
+        item.button?.toolTip = "IdleDimmer — " + t("dimming", "dimning") + ": \(enabled ? on : off), " + t("keep awake", "håll vaken") + ": \(keepAwake.isRunning ? on : off)"
     }
     @objc func toggleEnabled() {
         enabled.toggle(); toggle.state = enabled ? .on : .off
